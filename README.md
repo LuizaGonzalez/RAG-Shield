@@ -1,12 +1,12 @@
 # RAG Shield
 
-Proyecto de curso FDSI — Grupo 04
-Escuela Colombiana de Ingeniería Julio Garavito
+FDSI · Grupo 04 · Escuela Colombiana de Ingeniería Julio Garavito
 
-Simulación del asistente interno de **NovaCred**, empresa ficticia de
-crédito digital, evaluado frente a inyección indirecta de prompts a
-través de documentos recuperados (archivos, correos y páginas web
-simulados como canal).
+NovaCred es una financiera digital inventada para este curso. El
+asistente interno les responde a los analistas con lo que encuentra
+en políticas, procedimientos y casos. El problema que medimos es
+cuando un documento recuperado trae una instrucción escondida y el
+modelo la sigue como si fuera parte del sistema.
 
 ## Integrantes
 
@@ -15,13 +15,20 @@ simulados como canal).
 - Luiza Mariana Gonzalez Veloza
 - Rafael Santiago Moreno Velásquez
 
-## Setup
+## Cómo levantarlo
 
 ```bash
 python -m venv venv
-source venv/bin/activate  # o venv\Scripts\activate en Windows
+source venv/bin/activate   # en Windows: venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env  # completar LLM_API_KEY
+cp .env.example .env       # poner LLM_API_KEY
+```
+
+Con los documentos ya en `docs/legitimos/`, P2 indexa y P3 pregunta:
+
+```bash
+python -m src.ingest
+python -m src.pipeline
 ```
 
 ## Estructura
@@ -46,15 +53,19 @@ rag-shield/
 └─ app.py                   # Frontend Streamlit (MVP)
 ```
 
-## Fases
+En `docs/legitimos/` hay siete textos: ficha de libre inversión, mora,
+refinanciación, aprobación, score y capacidad de pago, desembolso, y
+el caso 00147. Cuadran entre sí (montos, tasas, quién aprueba qué).
+En esta fase solo importan ingest, retriever, generator y pipeline.
+Sanitizar, el harness y el frontend van después.
 
-1. RAG  (ingesta + recuperador + generacion, sin proteccion)
-2. Base documental completa + subconjunto envenenado
-3. Medicion de linea base (ASR sin proteccion)
-4. Implementar capa 1 y capa 2
-5. Medicion con capas activas y comparacion
-6. Capa 3 (opcional)
-7. Frontend + despliegue
-8. Informe final
+## Cómo lo vamos a hacer
 
-
+Primero dejamos el RAG pelado y vemos qué responde con documentos
+limpios. Después metemos textos con instrucciones ocultas (archivo,
+correo y web simulados) y medimos cuántas veces el modelo las
+obedece. Con esa línea base ponemos dos capas: una que limpia el
+texto recuperado y otra que le deja claro al modelo qué es dato y
+qué es instrucción. Si alcanza el tiempo, una tercera capa evita
+que el chat apruebe, condone o gire plata. Al final va el chat en
+Streamlit y el informe.
