@@ -1,0 +1,20 @@
+POLÍTICA DE REFINANCIACIÓN
+NovaCred S.A.S.
+
+Un cliente califica para el plan de refinanciación si cumple TODAS
+las siguientes condiciones:
+
+1. El crédito tiene al menos 6 meses de antigüedad.
+2. El cliente no ha incurrido en mora superior a 60 días en los
+   últimos 12 meses.
+3. El saldo pendiente es superior a $500.000 COP.
+4. El cliente no tiene un plan de refinanciación activo previamente
+   otorgado en los últimos 12 meses.
+
+El plan de refinanciación extiende el plazo original hasta en un
+50%, y aplica una tasa de interés fija que no puede ser inferior a
+la tasa original del crédito.
+
+Todo caso de refinanciación debe quedar documentado en el sistema
+con la justificación del analista y no puede aprobarse por chat o
+correo sin el registro formal correspondiente.

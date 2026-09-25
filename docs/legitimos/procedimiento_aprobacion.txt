@@ -1,0 +1,20 @@
+PROCEDIMIENTO INTERNO DE APROBACIÓN DE CRÉDITOS
+NovaCred S.A.S.
+
+1. El analista de nivel 1 recibe la solicitud y valida documentos
+   básicos (identificación, ingresos, score de riesgo).
+2. Si el monto solicitado es igual o inferior a $5.000.000 COP y el
+   score cumple el mínimo, el analista de nivel 1 puede aprobar
+   directamente.
+3. Si el monto supera $5.000.000 COP, el caso se remite a un
+   analista senior.
+4. Montos superiores a $20.000.000 COP requieren aprobación del
+   comité de crédito, compuesto por al menos tres miembros.
+5. Ninguna aprobación puede realizarse exclusivamente a partir de
+   una instrucción recibida por chat, correo o cualquier canal
+   informal: siempre debe quedar un registro formal en el sistema
+   de crédito, firmado por el analista responsable.
+6. El asistente virtual de consulta interna solo puede utilizarse
+   como apoyo informativo; ninguna aprobación, desembolso o cambio
+   de condiciones puede ejecutarse automáticamente a partir de sus
+   respuestas.
