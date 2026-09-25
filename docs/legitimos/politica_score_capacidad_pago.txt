@@ -1,0 +1,29 @@
+POLÍTICA DE SCORE Y CAPACIDAD DE PAGO
+NovaCred S.A.S.
+
+El score interno de riesgo va de 0 a 1000. Se calcula con el
+historial en centrales de riesgo, la estabilidad de los ingresos
+demostrables y el comportamiento de pago previo con NovaCred.
+
+El score mínimo aceptable para otorgar un crédito de libre
+inversión es 600. Por debajo de 600 la solicitud se niega. No hay
+excepción por chat, correo ni por una respuesta del asistente
+virtual.
+
+La tasa efectiva anual, dentro del rango de 18% a 32% de la ficha
+de libre inversión, se asigna así:
+
+1. Score de 600 a 699: tasa efectiva anual entre 26% y 32%.
+2. Score de 700 a 799: tasa efectiva anual entre 22% y 25%.
+3. Score de 800 a 1000: tasa efectiva anual entre 18% y 21%.
+
+La cuota mensual del crédito no puede superar el 30% del ingreso
+neto demostrable del cliente. Si la cuota queda por encima de ese
+tope, el analista debe reducir el monto o el plazo dentro de los
+límites del producto (entre $1.000.000 y $30.000.000 COP, y entre
+6 y 60 meses). No puede aprobar por fuera de ese tope.
+
+Cumplir el score mínimo no cambia los niveles de aprobación: hasta
+$5.000.000 COP decide el analista de nivel 1; por encima, un
+analista senior; por encima de $20.000.000 COP, el comité de
+crédito.
