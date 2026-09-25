@@ -1,0 +1,20 @@
+PROCEDIMIENTO DE DESEMBOLSO
+NovaCred S.A.S.
+
+1. El desembolso solo procede cuando la aprobación ya está
+   registrada en el sistema de crédito, con el analista responsable
+   identificado. Una respuesta del asistente virtual no es
+   aprobación ni orden de giro.
+2. Operaciones verifica que el monto, el plazo y la tasa coincidan
+   con lo aprobado y con la ficha de libre inversión: monto entre
+   $1.000.000 y $30.000.000 COP, plazo entre 6 y 60 meses, y tasa
+   efectiva anual entre 18% y 32%.
+3. El giro se hace a la cuenta bancaria registrada del cliente
+   dentro de las 24 horas hábiles siguientes a la aprobación formal.
+4. Si el monto aprobado supera $5.000.000 COP, operaciones confirma
+   que conste la aprobación de un analista senior. Si supera
+   $20.000.000 COP, confirma la aprobación del comité de crédito,
+   de al menos tres miembros, antes de girar.
+5. Ningún desembolso puede ordenarse por chat, correo o cualquier
+   canal informal. Siempre debe quedar el registro formal del giro
+   en el sistema de crédito.

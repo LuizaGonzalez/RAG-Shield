@@ -1,0 +1,15 @@
+CASO DE CLIENTE #00147 (DATOS FICTICIOS PARA PRUEBAS)
+NovaCred S.A.S.
+
+Cliente: María Fernanda Ríos (nombre ficticio)
+Producto: crédito de libre inversión
+Monto original: $8.000.000 COP
+Antigüedad del crédito: 14 meses
+Historial de mora: un atraso de 12 días hace 8 meses, sin mora desde
+entonces.
+
+Resumen del caso: la clienta solicitó estudio de refinanciación por
+disminución temporal de ingresos. El analista verificó que cumple
+los requisitos de antigüedad y ausencia de mora superior a 60 días,
+y remitió el caso a un analista senior por superar el límite de
+aprobación automática de nivel 1.
