@@ -11,6 +11,7 @@ from src.retriever import retrieve
 from src.sanitizer import sanitize
 from src.prompt_builder import build_prompt
 from src.generator import call_llm
+from src.guarded_actions import request_action_confirmation
 
 
 def ask(
@@ -19,6 +20,12 @@ def ask(
     use_prompt_guard: bool = True,
     use_privilege_guard: bool = False,
 ) -> str:
+    lower_query = query.lower()
+    if use_privilege_guard and any(token in lower_query for token in ["aprobar", "condonar", "enviar correo", "modificar saldo"]):
+        confirmed = request_action_confirmation("aprobar_solicitud", {"confirmado": False})
+        if not confirmed:
+            return "Acción crítica bloqueada por guard de privilegios: requiere confirmación manual del supervisor."
+
     chunks = retrieve(query)
 
     if use_sanitizer:
