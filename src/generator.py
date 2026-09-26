@@ -1,43 +1,69 @@
-"""Llamada al LLM via API comercial.
+"""Llamada al LLM vía GroqCloud.
 
-Responsable: Persona C
-Aisla el proveedor detras de call_llm() para poder cambiarlo sin
-tocar el resto del pipeline. Lee la API key desde variable de
-entorno (LLM_API_KEY), nunca hardcodeada.
+Responsable: Persona C (rol P3 en esta rotación)
+Fase: 1 (RAG pelado, sin protección)
+
+Aísla el proveedor del LLM detrás de call_llm() para poder cambiar
+de servicio (Groq, Anthropic, OpenAI) sin tocar el resto del
+pipeline. La API key se lee siempre desde variable de entorno,
+nunca escrita directamente en el código — esto sigue la misma buena
+práctica de seguridad que auditamos en el Lab04 (CWE-798, uso de
+credenciales embebidas).
 """
 
-from __future__ import annotations
-
 import os
-
 from dotenv import load_dotenv
 
 load_dotenv()
+_client = None
 
 
-def call_llm(prompt: str) -> str:
-    api_key = os.environ.get("LLM_API_KEY")
-    provider = (os.environ.get("LLM_PROVIDER") or "anthropic").lower()
+def get_client():
+    """Devuelve el cliente de Groq, creándolo la primera vez que se necesita.
 
-    if not api_key:
-        snippet = prompt.split("Contexto:", 1)[-1].split("Pregunta del usuario:", 1)[0].strip()
-        return (
-            "Modo local: no hay LLM_API_KEY configurada. "
-            f"Se responde con base en el contexto disponible: {snippet[:350]}"
-        )
+    Levanta RuntimeError si la variable de entorno LLM_API_KEY no
+    está configurada, en vez de fallar más adelante con un error
+    críptico del SDK.
 
-    if provider == "anthropic":
-        try:
-            from anthropic import Anthropic
-
-            client = Anthropic(api_key=api_key)
-            response = client.messages.create(
-                model="claude-3-haiku-20240307",
-                max_tokens=256,
-                messages=[{"role": "user", "content": prompt}],
+    Returns:
+        groq.Groq: cliente ya autenticado, listo para hacer llamadas.
+    """
+    global _client
+    if _client is None:
+        import groq
+        api_key = os.environ.get("LLM_API_KEY")
+        if not api_key:
+            raise RuntimeError(
+                "LLM_API_KEY no configurada. Copia .env.example a .env "
+                "y completa tu API key de GroqCloud."
             )
-            return response.content[0].text
-        except Exception as exc:
-            return f"No se pudo consultar Anthropic: {exc}. Respuesta local basada en contexto disponible."
+        _client = groq.Groq(api_key=api_key)
+    return _client
 
-    return f"Proveedor no soportado: {provider}. Configura LLM_PROVIDER o usa la respuesta local."
+
+# Modelo por defecto: se puede sobreescribir con la variable de
+# entorno LLM_MODEL sin tocar este archivo.
+DEFAULT_MODEL = os.environ.get("LLM_MODEL", "llama-3.3-70b-versatile")
+
+
+def call_llm(prompt: str, model: str = None, max_tokens: int = 1000) -> str:
+    """Envía un prompt al LLM y devuelve el texto de la respuesta.
+
+    Args:
+        prompt: el texto completo que recibe el modelo (contexto +
+            pregunta, ya armado por quien llama a esta función).
+        model: nombre del modelo de Groq a usar; si se omite, usa
+            DEFAULT_MODEL (configurable vía LLM_MODEL en .env).
+        max_tokens: límite de tokens de la respuesta generada.
+
+    Returns:
+        str: el texto de la respuesta del modelo, sin metadata extra.
+    """
+    model = model or DEFAULT_MODEL
+    client = get_client()
+    response = client.chat.completions.create(
+        model=model,
+        max_tokens=max_tokens,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return response.choices[0].message.content
