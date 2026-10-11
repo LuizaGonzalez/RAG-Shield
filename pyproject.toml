@@ -1,0 +1,11 @@
+[project]
+name = "rag-shield"
+version = "0.2.0"
+description = "Evaluación de inyección indirecta de prompts en un RAG de laboratorio (NovaCred, empresa ficticia)."
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning"]
