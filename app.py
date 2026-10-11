@@ -1,14 +1,15 @@
-"""Frontend MVP: herramienta interna del equipo de atencion NovaCred.
+"""Frontend MVP: herramienta interna del equipo de atención NovaCred.
 
-Responsable: compartido (fase 7)
-Chat + toggles de capas + panel de metricas, conectado a src.pipeline.
+Consulta + toggles de capas, conectado a src.pipeline.ask().
 """
 
 from __future__ import annotations
 
 import streamlit as st
 
+from src.generator import LLMConfigError
 from src.pipeline import ask
+from src.retriever import IndexNotReadyError
 
 st.set_page_config(page_title="NovaCred · RAG Shield", layout="centered")
 
@@ -16,22 +17,29 @@ st.title("NovaCred — asistente interno")
 st.caption("Demo de laboratorio · RAG Shield · curso FDSI")
 
 with st.sidebar:
-    st.header("Controles de capa")
-    use_sanitizer = st.checkbox("Usar sanitizador", value=True)
-    use_prompt_guard = st.checkbox("Usar guard de prompt", value=True)
-    use_privilege_guard = st.checkbox("Usar guard de privilegios", value=False)
+    st.header("Capas de defensa")
+    use_sanitizer = st.checkbox("Capa 1: sanitización", value=False)
+    use_prompt_guard = st.checkbox("Capa 2: separación del prompt", value=False)
+    use_privilege_guard = st.checkbox("Capa 3: mínimo privilegio", value=False)
 
-    st.header("Métricas")
-    st.caption("Se leen los resultados de eval/results/eval_results.csv si existen.")
-
-query = st.text_area("Pregunta para el asistente", value="¿Qué requisitos debe cumplir un cliente para entrar en mora?")
+query = st.text_area("Pregunta para el asistente", value="¿Qué pasa si un crédito supera 90 días de atraso?")
 
 if st.button("Consultar"):
-    answer = ask(
-        query,
-        use_sanitizer=use_sanitizer,
-        use_prompt_guard=use_prompt_guard,
-        use_privilege_guard=use_privilege_guard,
-    )
-    st.markdown("### Respuesta")
-    st.write(answer)
+    try:
+        result = ask(
+            query,
+            use_sanitizer=use_sanitizer,
+            use_prompt_guard=use_prompt_guard,
+            use_privilege_guard=use_privilege_guard,
+        )
+    except (IndexNotReadyError, LLMConfigError) as exc:
+        st.error(str(exc))
+    else:
+        st.markdown("### Respuesta")
+        st.write(result["respuesta"])
+        st.caption(f"{result['proveedor']} · {result['modelo']} · {result['latencia_segundos']} s")
+        st.markdown("### Documentos recuperados")
+        for chunk in result["chunks"]:
+            meta = chunk["metadata"]
+            marca = "envenenado" if meta.get("is_poisoned") else "legítimo"
+            st.write(f"- `{meta.get('file_name')}` ({marca})")
