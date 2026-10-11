@@ -1,43 +1,100 @@
-"""Llamada al LLM via API comercial.
+"""Llamada al LLM.
 
-Responsable: Persona C
-Aisla el proveedor detras de call_llm() para poder cambiarlo sin
-tocar el resto del pipeline. Lee la API key desde variable de
-entorno (LLM_API_KEY), nunca hardcodeada.
+Un solo proveedor por corrida, elegido con LLM_PROVIDER:
+  - groq (por defecto): GroqCloud, modelo llama-3.3-70b-versatile
+  - anthropic: Claude, modelo claude-3-5-haiku-latest
+  - mock: respuesta determinista para pruebas; nunca se reporta como resultado
+
+La API key se lee de LLM_API_KEY, nunca del código.
 """
 
 from __future__ import annotations
 
 import os
+import time
 
-from dotenv import load_dotenv
+DEFAULT_MODELS = {
+    "groq": "llama-3.3-70b-versatile",
+    "anthropic": "claude-3-5-haiku-latest",
+    "mock": "mock",
+}
+MAX_RETRIES = 4
 
-load_dotenv()
+
+class LLMConfigError(RuntimeError):
+    pass
 
 
-def call_llm(prompt: str) -> str:
-    api_key = os.environ.get("LLM_API_KEY")
-    provider = (os.environ.get("LLM_PROVIDER") or "anthropic").lower()
+def provider() -> str:
+    name = os.environ.get("LLM_PROVIDER", "groq").strip().lower()
+    if name not in DEFAULT_MODELS:
+        raise LLMConfigError(f"LLM_PROVIDER='{name}' no es válido. Usa: {', '.join(DEFAULT_MODELS)}")
+    return name
 
-    if not api_key:
-        snippet = prompt.split("Contexto:", 1)[-1].split("Pregunta del usuario:", 1)[0].strip()
-        return (
-            "Modo local: no hay LLM_API_KEY configurada. "
-            f"Se responde con base en el contexto disponible: {snippet[:350]}"
-        )
 
-    if provider == "anthropic":
+def model_name() -> str:
+    return os.environ.get("LLM_MODEL") or DEFAULT_MODELS[provider()]
+
+
+def _settings() -> tuple[float, int]:
+    return float(os.environ.get("LLM_TEMPERATURE", "0.7")), int(os.environ.get("LLM_MAX_TOKENS", "600"))
+
+
+def _api_key() -> str:
+    key = os.environ.get("LLM_API_KEY", "").strip()
+    if not key or key.startswith("tu_api_key"):
+        raise LLMConfigError("LLM_API_KEY no está configurada. Copia .env.example a .env y pon tu key.")
+    return key
+
+
+def _mock(prompt: str) -> str:
+    context = prompt.split("Pregunta", 1)[0]
+    return f"[MODO MOCK] Respuesta simulada a partir del contexto: {' '.join(context.split())[:400]}"
+
+
+def _groq(prompt: str, system: str | None) -> str:
+    from groq import Groq
+
+    temperature, max_tokens = _settings()
+    messages = ([{"role": "system", "content": system}] if system else []) + [
+        {"role": "user", "content": prompt}
+    ]
+    response = Groq(api_key=_api_key()).chat.completions.create(
+        model=model_name(), messages=messages, temperature=temperature, max_tokens=max_tokens
+    )
+    return response.choices[0].message.content or ""
+
+
+def _anthropic(prompt: str, system: str | None) -> str:
+    from anthropic import Anthropic
+
+    temperature, max_tokens = _settings()
+    kwargs = {"system": system} if system else {}
+    response = Anthropic(api_key=_api_key()).messages.create(
+        model=model_name(),
+        max_tokens=max_tokens,
+        temperature=temperature,
+        messages=[{"role": "user", "content": prompt}],
+        **kwargs,
+    )
+    return "".join(block.text for block in response.content if getattr(block, "type", "") == "text")
+
+
+def _is_rate_limit(exc: Exception) -> bool:
+    return getattr(exc, "status_code", None) == 429 or "rate limit" in str(exc).lower()
+
+
+def call_llm(prompt: str, system: str | None = None) -> str:
+    name = provider()
+    if name == "mock":
+        return _mock(prompt)
+
+    backend = _groq if name == "groq" else _anthropic
+    for attempt in range(MAX_RETRIES):
         try:
-            from anthropic import Anthropic
-
-            client = Anthropic(api_key=api_key)
-            response = client.messages.create(
-                model="claude-3-haiku-20240307",
-                max_tokens=256,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            return response.content[0].text
+            return backend(prompt, system)
         except Exception as exc:
-            return f"No se pudo consultar Anthropic: {exc}. Respuesta local basada en contexto disponible."
-
-    return f"Proveedor no soportado: {provider}. Configura LLM_PROVIDER o usa la respuesta local."
+            if not _is_rate_limit(exc) or attempt == MAX_RETRIES - 1:
+                raise
+            time.sleep(2 ** attempt * 5)
+    raise AssertionError("unreachable")
