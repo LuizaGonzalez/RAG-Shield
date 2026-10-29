@@ -29,10 +29,56 @@ pip install -r requirements-dev.txt
 cp .env.example .env              # poner LLM_API_KEY (Groq es gratis)
 python -m src.ingest              # indexa docs/ una vez
 python -m src.pipeline            # una pregunta de prueba
-streamlit run app.py              # la demo
+
+# usuarios (la contraseña se pide por consola y se guarda con hash en usuarios.json)
+python -m src.auth crear --usuario jurado --nombre "Jurado FDSI" --rol laboratorio
+python -m src.auth crear --usuario ana.cardenas --nombre "Ana Cárdenas" --rol empleado --departamento cartera
+
+streamlit run app.py              # la app
 ```
 
-Las mediciones se hacen con GroqCloud y `llama-3.3-70b-versatile`.
+## Pantallas y roles (mínimo privilegio)
+
+El frontend sigue el diseño "RAG Shield · Interfaces finales". Cada
+pantalla tiene un dueño y los permisos se revisan en el servidor
+(`src/auth.py`) antes de cada acción, no solo escondiendo botones.
+
+| Pantalla | Rol | Qué puede hacer |
+|---|---|---|
+| Inicio de sesión | todos | Entrar. Tras 5 intentos fallidos se bloquea la sesión. |
+| Laboratorio · Asistente | `laboratorio` (jurado y profesora) | Encender y apagar capas, comparar con y sin defensas, subir documentos a la base, reindexar, ver la cuarentena, aprobar o descartar propuestas. |
+| Laboratorio · Resultados, Auditoría | `laboratorio` | Métricas de `eval/results/` y el registro de auditoría. |
+| Empleado | `empleado` (con departamento) | Preguntar con las 3 capas siempre activas. Solo recupera documentos **aprobados** de **su** departamento. Adjuntos que viven en la sesión y nunca entran a la base. Puede proponer un documento, que queda en cuarentena hasta que Laboratorio lo apruebe. |
+
+- **Cuarentena al ingerir.** La Capa 1 revisa cada documento completo
+  al indexarlo. Si encuentra algo, queda en `cuarentena`. El
+  Laboratorio lo sigue recuperando para medir; el Empleado nunca.
+- **Departamentos.** `docs/departamentos.json` dice qué departamento
+  puede consultar cada documento. Lo que no aparece ahí no lo ve ningún
+  empleado: por defecto se niega.
+- **Capa 3 sobre la petición.** En la vista de Empleado, una orden como
+  "condona la mora del cliente 00147" se retiene sin llamar al modelo.
+  La evaluación no usa esta parte: sigue revisando solo la respuesta.
+- **Auditoría.** `data/auditoria.jsonl` registra quién preguntó, con
+  qué capas, qué fuentes se usaron y qué capa actuó. No guarda el texto
+  de las respuestas.
+- **Correo (IMAP).** Laboratorio puede importar los correos más recientes
+  de un buzón (variables `IMAP_*` en `.env`). La conexión usa TLS, abre la
+  carpeta en solo lectura y no marca nada como leído. Cada correo pasa por
+  la Capa 1 como cualquier documento y va a `docs/correos/`; un correo ya
+  importado no se repite. Las credenciales nunca se muestran en la app.
+- **Tema oscuro.** Botón "Modo oscuro / Modo claro" en la barra lateral y
+  en el inicio de sesión (también en el menú ⋮ de Streamlit). Se recuerda
+  en el navegador.
+- Lo que crea la app (`usuarios.json`, `data/`, `docs/subidos/`,
+  `docs/propuestas/`, `docs/correos/`) no se sube a git. Lo subido desde la app entra al
+  índice: para repetir una medición, déjalo vacío y corre
+  `python -m src.ingest`.
+
+Las mediciones se hacen con GroqCloud y `qwen/qwen3.8-27b`. Groq retiró
+`llama-3.3-70b-versatile`, el modelo original; los resultados medidos con
+él no se pueden comparar directamente con los nuevos. Para usar otro modelo,
+pon `LLM_MODEL=` en `.env`.
 Para cambiar de proveedor basta con `LLM_PROVIDER=anthropic` en `.env`;
 el código no cambia.
 
@@ -71,12 +117,15 @@ GitHub Actions las corre en cada push y PR.
 rag-shield/
 ├─ docs/
 │  ├─ legitimos/            # 7 documentos limpios de NovaCred
-│  └─ envenenados/          # 9 documentos con instrucciones ocultas
+│  ├─ envenenados/          # 9 documentos con instrucciones ocultas
+│  └─ departamentos.json    # qué departamento ve cada documento
 ├─ src/
 │  ├─ config.py             # rutas y parámetros
+│  ├─ auth.py               # usuarios, roles y permisos
+│  ├─ storage.py            # subidas, propuestas, adjuntos, sesiones, auditoría
 │  ├─ embeddings.py         # mismo modelo para indexar y consultar
-│  ├─ ingest.py             # .txt y .html a ChromaDB, con canal y técnica
-│  ├─ retriever.py          # top-k chunks con su metadata
+│  ├─ ingest.py             # .txt/.html/.md a ChromaDB, con cuarentena y departamento
+│  ├─ retriever.py          # top-k chunks con su metadata y filtro por rol
 │  ├─ sanitizer.py          # Capa 1: HTML oculto, Unicode invisible, frases
 │  ├─ prompt_builder.py     # Capa 2: datos delimitados, reglas en el system
 │  ├─ generator.py          # Groq o Anthropic, uno por corrida
@@ -91,7 +140,7 @@ rag-shield/
 │  ├─ eval_harness.py       # corre todo y escribe resultados
 │  └─ results/
 ├─ tests/
-└─ app.py                   # demo en Streamlit
+└─ app.py                   # frontend en Streamlit: login, Laboratorio y Empleado
 ```
 
 ## Fases

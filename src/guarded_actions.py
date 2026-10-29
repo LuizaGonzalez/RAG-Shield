@@ -11,6 +11,7 @@ se bloquea.
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass, field
 
 BLOCK_MESSAGE = (
@@ -71,6 +72,67 @@ def inspect_response(text: str) -> GuardResult:
                     evidence.append(sentence.strip())
                     break
     return GuardResult(bool(actions), actions, list(dict.fromkeys(evidence)))
+
+
+REQUEST_MESSAGE = (
+    "No puedo ejecutar esa acción. El asistente solo informa: esa solicitud requiere registro formal "
+    "y confirmación de un supervisor."
+)
+
+_IMPERATIVES = {
+    "aprobar_credito": "aprueba|apruebe|apruebalo|apruebala",
+    "condonar_mora": "condona|condone|condonalo|condonala|condonale",
+    "ordenar_desembolso": "desembolsa|desembolse|desembolsalo|gira|gire|transfiere|transfiera",
+    "enviar_datos": "envia|envie|envialo|enviale|reenvia|reenvie|manda|mande|remite|remita",
+    "modificar_condiciones": "modifica|modifique|cambia|cambie|ajusta|ajuste",
+}
+_INFINITIVES = {
+    "aprobar_credito": "aprobar|aprobarme",
+    "condonar_mora": "condonar|condonarle",
+    "ordenar_desembolso": "desembolsar|girar|transferir",
+    "enviar_datos": "enviar|reenviar|mandar|remitir",
+    "modificar_condiciones": "modificar|cambiar|ajustar",
+}
+_SUBJUNCTIVES = {
+    "aprobar_credito": "apruebes",
+    "condonar_mora": "condones",
+    "ordenar_desembolso": "desembolses|gires|transfieras",
+    "enviar_datos": "envies|reenvies|mandes|remitas",
+    "modificar_condiciones": "modifiques|cambies|ajustes",
+}
+_REQUEST_PATTERNS = {
+    action: [
+        re.compile(rf"^(?:por favor,?\s+|ahora\s+|ya\s+)*(?:{_IMPERATIVES[action]})\b"),
+        re.compile(rf"\b(?:puedes|podrias)\s+(?:me\s+|le\s+)?(?:{_INFINITIVES[action]})\b"),
+        re.compile(rf"\bque\s+(?:me\s+|le\s+)?(?:{_SUBJUNCTIVES[action]})\b"),
+    ]
+    for action in _IMPERATIVES
+}
+
+
+def _plain(text: str) -> str:
+    text = unicodedata.normalize("NFKD", text.lower())
+    return "".join(c for c in text if not unicodedata.combining(c))
+
+
+def detect_action_request(query: str) -> list[str]:
+    """Acciones críticas que la pregunta le pide ejecutar al asistente.
+
+    Solo cuenta órdenes en segunda persona ("condona la mora", "¿puedes
+    aprobar...?", "necesito que envíes..."). Una pregunta informativa en
+    tercera persona ("¿se puede condonar...?", "¿cambia la tasa...?") pasa.
+    Es una heurística de la vista de Empleado; la evaluación no la usa.
+    """
+    actions: list[str] = []
+    for sentence in re.split(r"(?<=[.!?])|\n", _plain(query or "")):
+        sentence = sentence.strip(" ,;:.!")
+        is_question = sentence.startswith("¿") or sentence.endswith("?")
+        for action, (imperative, infinitive, subjunctive) in _REQUEST_PATTERNS.items():
+            hit = (not is_question and imperative.search(sentence)) or infinitive.search(sentence) \
+                or subjunctive.search(sentence)
+            if hit and action not in actions:
+                actions.append(action)
+    return actions
 
 
 def request_action_confirmation(action: str, params: dict) -> bool:

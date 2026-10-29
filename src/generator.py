@@ -1,7 +1,7 @@
 """Llamada al LLM.
 
 Un solo proveedor por corrida, elegido con LLM_PROVIDER:
-  - groq (por defecto): GroqCloud, modelo llama-3.3-70b-versatile
+  - groq (por defecto): GroqCloud, modelo qwen/qwen3.8-27b (llama-3.3-70b-versatile ya no está disponible)
   - anthropic: Claude, modelo claude-3-5-haiku-latest
   - mock: respuesta determinista para pruebas; nunca se reporta como resultado
 
@@ -14,7 +14,7 @@ import os
 import time
 
 DEFAULT_MODELS = {
-    "groq": "llama-3.3-70b-versatile",
+    "groq": "qwen/qwen3.8-27b",
     "anthropic": "claude-3-5-haiku-latest",
     "mock": "mock",
 }
@@ -81,7 +81,11 @@ def _anthropic(prompt: str, system: str | None) -> str:
 
 
 def _is_rate_limit(exc: Exception) -> bool:
-    return getattr(exc, "status_code", None) == 429 or "rate limit" in str(exc).lower()
+    """Límite por minuto: vale la pena esperar y reintentar. La cuota diaria no se libera en segundos."""
+    message = str(exc).lower()
+    if "per day" in message:
+        return False
+    return getattr(exc, "status_code", None) == 429 or "rate limit" in message
 
 
 def call_llm(prompt: str, system: str | None = None) -> str:

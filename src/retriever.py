@@ -11,7 +11,7 @@ from pathlib import Path
 
 import chromadb
 
-from src.config import COLLECTION_NAME, chroma_dir, default_k
+from src.config import COLLECTION_NAME, DEPARTMENTS, chroma_dir, default_k
 from src.embeddings import embed
 
 
@@ -37,16 +37,55 @@ def indexed_sources(collection_name: str = COLLECTION_NAME, persist_dir: str | P
     return {m["file_name"] for m in metadatas}
 
 
+def employee_filter(department: str) -> dict:
+    """Lo único que puede recuperar un empleado: documentos aprobados de su departamento."""
+    if department not in DEPARTMENTS:
+        raise ValueError(f"Departamento desconocido: {department}")
+    return {"$and": [{"estado": "aprobado"}, {f"dep_{department}": True}]}
+
+
+def indexed_documents(
+    where: dict | None = None,
+    collection_name: str = COLLECTION_NAME,
+    persist_dir: str | Path | None = None,
+) -> list[dict]:
+    """Un registro por documento indexado (no por chunk), con su número de chunks."""
+    metadatas = get_collection(collection_name, persist_dir).get(where=where, include=["metadatas"])["metadatas"]
+    documents: dict[str, dict] = {}
+    for meta in metadatas:
+        entry = documents.setdefault(meta["source_file"], {**meta, "chunks": 0})
+        entry["chunks"] += 1
+    for entry in documents.values():
+        entry.pop("chunk_index", None)
+        entry["departamentos"] = [d for d in DEPARTMENTS if entry.get(f"dep_{d}")]
+    return sorted(documents.values(), key=lambda d: d["source_file"])
+
+
+def rank_chunks(query: str, chunks: list[dict], k: int) -> list[dict]:
+    """Ordena chunks que no están en el índice (adjuntos de sesión) por similitud con la pregunta."""
+    if len(chunks) <= k:
+        return list(chunks)
+    vectors = embed([query] + [c["text"] for c in chunks])
+    scores = [sum(a * b for a, b in zip(vectors[0], v)) for v in vectors[1:]]
+    order = sorted(range(len(chunks)), key=lambda i: scores[i], reverse=True)[:k]
+    return [chunks[i] for i in sorted(order)]
+
+
 def retrieve(
     query: str,
     k: int | None = None,
     collection_name: str = COLLECTION_NAME,
     persist_dir: str | Path | None = None,
+    where: dict | None = None,
 ) -> list[dict]:
     collection = get_collection(collection_name, persist_dir)
+    available = collection.count() if where is None else len(collection.get(where=where, include=[])["ids"])
+    if available == 0:
+        return []
     results = collection.query(
         query_embeddings=embed([query]),
-        n_results=min(k or default_k(), collection.count()),
+        n_results=min(k or default_k(), available),
+        where=where,
         include=["documents", "metadatas", "distances"],
     )
     return [

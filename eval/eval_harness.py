@@ -48,6 +48,31 @@ class DatasetError(ValueError):
     pass
 
 
+class QuotaExhaustedError(RuntimeError):
+    """El proveedor agotó la cuota diaria: seguir solo acumularía errores."""
+
+
+class RunFailedError(RuntimeError):
+    """Demasiados intentos con error: la corrida no reemplaza resultados anteriores."""
+
+
+# Una corrida con más errores que esto no reemplaza resultados: sus métricas no serían comparables.
+MAX_ERROR_RATE = 0.25
+_DAILY_QUOTA = ("per day", "tokens per day", "requests per day", "(tpd)", "(rpd)")
+
+
+def is_daily_quota(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return any(marker in message for marker in _DAILY_QUOTA)
+
+
+def _write_csv(path: Path, rows: list[dict]) -> None:
+    with path.open("w", encoding="utf-8", newline="") as fp:
+        writer = csv.DictWriter(fp, fieldnames=FIELDS)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
 def _row(config: str, tipo: str, item: dict, attempt: int, result: dict | None, error: str = "") -> dict:
     row = {field: "" for field in FIELDS}
     row.update(
@@ -143,6 +168,11 @@ def run_evaluation(
                 result = ask_fn(item["pregunta"], **flags)
                 rows.append(_row(config, tipo, item, attempt, result))
             except Exception as exc:
+                if is_daily_quota(exc):
+                    raise QuotaExhaustedError(
+                        f"[{config}] Se agotó la cuota diaria del proveedor; no se guardó nada y los resultados "
+                        f"anteriores siguen intactos. Repite esta configuración cuando se libere la cuota.\n{exc}"
+                    ) from exc
                 rows.append(_row(config, tipo, item, attempt, None, error=f"{type(exc).__name__}: {exc}"))
             if pause:
                 time.sleep(pause)
@@ -150,11 +180,16 @@ def run_evaluation(
 
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
+    errors = sum(1 for r in rows if r["error"])
+    if errors > MAX_ERROR_RATE * len(rows):
+        failed_path = out / f"{config}_fallida.csv"
+        _write_csv(failed_path, rows)
+        raise RunFailedError(
+            f"[{config}] {errors} de {len(rows)} intentos fallaron (máximo {MAX_ERROR_RATE:.0%}). No se reemplazaron "
+            f"los resultados anteriores; el detalle quedó en {failed_path}."
+        )
     csv_path = out / f"{config}.csv"
-    with csv_path.open("w", encoding="utf-8", newline="") as fp:
-        writer = csv.DictWriter(fp, fieldnames=FIELDS)
-        writer.writeheader()
-        writer.writerows(rows)
+    _write_csv(csv_path, rows)
 
     summary = summarize(rows)
     summary.update(config=config, repeticiones=repeticiones, flags=flags)
@@ -212,8 +247,18 @@ def main(argv: list[str] | None = None) -> None:
         print(ingest_documents())
 
     configs = list(CONFIGS) if "todas" in args.config else args.config
+    failed = []
     for config in configs:
-        result = run_evaluation(config, args.repeticiones, strict=not args.no_estricto, pause=args.pausa)
+        try:
+            result = run_evaluation(config, args.repeticiones, strict=not args.no_estricto, pause=args.pausa)
+        except QuotaExhaustedError as exc:
+            print(exc)
+            failed += [c for c in configs[configs.index(config):]]
+            break
+        except RunFailedError as exc:
+            print(exc)
+            failed.append(config)
+            continue
         s = result["summary"]
         print(
             f"{config}: ASR {_fmt(s['asr'], ' %')} (rondas {_fmt(s['asr_rango_rondas'], ' %')}), "
@@ -222,6 +267,8 @@ def main(argv: list[str] | None = None) -> None:
         )
     if args.comparar:
         print(f"Comparación: {write_comparison()}")
+    if failed:
+        raise SystemExit(f"Sin medir (repítelas luego): {' '.join(failed)}")
 
 
 if __name__ == "__main__":

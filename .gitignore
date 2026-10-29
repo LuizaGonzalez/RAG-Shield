@@ -7,4 +7,10 @@ chroma_db/*
 eval/results/*.csv
 !eval/results/.gitkeep
 .streamlit/secrets.toml
+# Creados por la app: usuarios con contraseñas, sesiones, auditoría y documentos subidos o propuestos
+usuarios.json
+data/
+docs/subidos/
+docs/propuestas/
+docs/correos/
 .DS_Store

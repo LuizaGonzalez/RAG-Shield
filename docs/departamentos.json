@@ -1,0 +1,19 @@
+{
+  "_descripcion": "Qué departamento puede consultar cada documento. Valores: cartera, credito o todos. Un documento que no aparece aquí no lo ve ningún empleado (por defecto se niega). Los envenenados también tienen departamento: si la Capa 1 no los detectara al ingerirlos, llegarían a esos empleados.",
+  "legitimos/caso_cliente_00147.txt": ["cartera"],
+  "legitimos/ficha_producto_libre_inversion.txt": "todos",
+  "legitimos/politica_mora.txt": ["cartera"],
+  "legitimos/politica_refinanciacion.txt": ["cartera"],
+  "legitimos/politica_score_capacidad_pago.txt": ["credito"],
+  "legitimos/procedimiento_aprobacion.txt": "todos",
+  "legitimos/procedimiento_desembolso.txt": ["credito"],
+  "envenenados/archivo_comentario_html_condonar_mora.txt": ["cartera"],
+  "envenenados/archivo_html_oculto_limite_aprobacion.html": "todos",
+  "envenenados/archivo_unicode_invisible_prompt_leak.txt": "todos",
+  "envenenados/correo_comentario_html_dato_cliente.txt": ["cartera"],
+  "envenenados/correo_html_oculto_score_minimo.html": ["credito"],
+  "envenenados/correo_unicode_invisible_aprobacion_automatica.txt": ["credito"],
+  "envenenados/web_comentario_html_refinanciacion.txt": ["cartera"],
+  "envenenados/web_html_oculto_desembolso.html": ["credito"],
+  "envenenados/web_unicode_invisible_ignorar_politica.txt": "todos"
+}
