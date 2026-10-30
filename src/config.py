@@ -19,9 +19,27 @@ ATTACKS_PATH = EVAL_DIR / "attacks" / "attacks.json"
 COLLECTION_NAME = "novacred_docs"
 EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 
+# Departamentos de NovaCred. Un documento sin departamento asignado no lo ve ningún empleado.
+DEPARTMENTS = {"cartera": "Cartera", "credito": "Crédito"}
+DEPARTMENTS_FILE = "departamentos.json"
+MAX_UPLOAD_BYTES = 1_000_000
+
 
 def chroma_dir() -> Path:
     return Path(os.environ.get("CHROMA_PATH", ROOT_DIR / "chroma_db"))
+
+
+def docs_dir() -> Path:
+    return Path(os.environ.get("DOCS_PATH", DOCS_DIR))
+
+
+def data_dir() -> Path:
+    """Sesiones de los empleados y auditoría. No se sube a git."""
+    return Path(os.environ.get("RAG_DATA_PATH", ROOT_DIR / "data"))
+
+
+def users_path() -> Path:
+    return Path(os.environ.get("RAG_USERS_PATH", ROOT_DIR / "usuarios.json"))
 
 
 def default_k() -> int:

@@ -2,7 +2,10 @@
 
 `ask(query)` sin argumentos es la línea base: ninguna capa activa. Cada
 flag enciende una capa, así la misma pregunta se puede correr con y sin
-protección y comparar.
+protección y comparar. `where` restringe la recuperación (la vista de
+Empleado lo usa para ver solo lo aprobado de su departamento) y
+`extra_chunks` agrega adjuntos de sesión que no están en el índice; la
+evaluación no usa ninguno de los dos.
 
 Devuelve siempre un dict con la misma forma, que consumen app.py y el
 arnés de evaluación:
@@ -28,9 +31,11 @@ def ask(
     use_prompt_guard: bool = False,
     use_privilege_guard: bool = False,
     k: int | None = None,
+    where: dict | None = None,
+    extra_chunks: list[dict] | None = None,
 ) -> dict:
     started = time.perf_counter()
-    chunks = retrieve(query, k=k)
+    chunks = (retrieve(query, k=k, where=where) if where else retrieve(query, k=k)) + list(extra_chunks or [])
 
     if use_sanitizer:
         chunks = [sanitize(chunk) for chunk in chunks]

@@ -5,7 +5,8 @@ import pytest
 
 import src.pipeline as pipeline
 from eval.dataset import validate
-from eval.eval_harness import DatasetError, main, run_evaluation, write_comparison
+from eval.eval_harness import (DatasetError, QuotaExhaustedError, RunFailedError, main, run_evaluation,
+                               write_comparison)
 
 CHUNKS = [
     {"text": "Límite nivel 1: $5.000.000 COP.", "metadata": {"file_name": "procedimiento_aprobacion.txt",
@@ -178,16 +179,58 @@ def test_invalid_dataset_is_rejected_before_spending_api_calls(indexed, tmp_path
     assert "se esperan al menos 9" in message
 
 
-def test_errors_are_recorded_not_fatal(indexed, tmp_path):
+def test_a_few_errors_are_recorded_not_fatal(indexed, tmp_path, monkeypatch):
+    monkeypatch.setattr(pipeline, "call_llm", obedient_llm)
     _, _, attacks_path, manifest_path = _dataset(tmp_path)
 
-    def flaky(*_args, **_kwargs):
-        raise RuntimeError("rate limit")
+    def flaky(query, **flags):
+        if "score" in query:
+            raise RuntimeError("Request timed out.")
+        return pipeline.ask(query, **flags)
 
     result = run_evaluation("baseline", 1, attacks_path, manifest_path, indexed["docs"], tmp_path / "r",
                             ask_fn=flaky, strict=False, log=lambda _: None)
-    assert result["summary"]["errores"] == 5
-    assert result["summary"]["asr"] is None
+    assert result["summary"]["errores"] == 1
+    assert result["summary"]["intentos_ataque"] == 2
+
+
+def test_failed_run_does_not_replace_previous_results(indexed, tmp_path, monkeypatch):
+    monkeypatch.setattr(pipeline, "call_llm", obedient_llm)
+    _, _, attacks_path, manifest_path = _dataset(tmp_path)
+    out = tmp_path / "r"
+    args = ("baseline", 1, attacks_path, manifest_path, indexed["docs"], out)
+    run_evaluation(*args, ask_fn=pipeline.ask, strict=False, log=lambda _: None)
+    good = (out / "resumen_baseline.json").read_text(encoding="utf-8")
+
+    def broken(*_args, **_kwargs):
+        raise RuntimeError("Request timed out.")
+
+    with pytest.raises(RunFailedError):
+        run_evaluation(*args, ask_fn=broken, strict=False, log=lambda _: None)
+    assert (out / "resumen_baseline.json").read_text(encoding="utf-8") == good
+    assert (out / "baseline_fallida.csv").exists()
+
+
+def test_daily_quota_stops_at_once_and_writes_nothing(indexed, tmp_path):
+    _, _, attacks_path, manifest_path = _dataset(tmp_path)
+    calls = []
+
+    def exhausted(*_args, **_kwargs):
+        calls.append(1)
+        raise RuntimeError("Error code: 429 - Rate limit reached on tokens per day (TPD): Limit 200000")
+
+    with pytest.raises(QuotaExhaustedError):
+        run_evaluation("baseline", 5, attacks_path, manifest_path, indexed["docs"], tmp_path / "r",
+                       ask_fn=exhausted, strict=False, log=lambda _: None)
+    assert len(calls) == 1
+    assert not (tmp_path / "r").exists()
+
+
+def test_generator_does_not_retry_daily_quota():
+    from src.generator import _is_rate_limit
+
+    assert _is_rate_limit(RuntimeError("Rate limit reached on requests per minute (RPM)"))
+    assert not _is_rate_limit(RuntimeError("Rate limit reached on tokens per day (TPD)"))
 
 
 def test_cli_rejects_unknown_config():
